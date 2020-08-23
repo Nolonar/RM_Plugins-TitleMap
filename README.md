@@ -1,6 +1,8 @@
 # N_TitleMap
 Use a map as title screen instead of a static image.
 
+![Screenshot TitleMap][on]
+
 | Project      | Latest release      |
 | ------------ | ------------------- |
 | N_TitleMap   | [Download][release] |
@@ -14,6 +16,20 @@ Tested and confirmed working:
 
 ## Terms of Use
 According to [LICENSE](LICENSE).
+
+## How to use
+
+Enter the ID of the map you would like to display.
+
+![Screenshot plugin manager][setup]
+
+You can see the Map ID in the status bar at the bottom of the RPG Maker UI.
+
+![Screenshot editor][setup2]
+
+  [on]: TitleMap_on.png
+  [setup]: TitleMap_setup.png
+  [setup2]: TitleMap_setup_2.png
 
   [hub]: https://github.com/Nolonar/RM_Plugins
   [release]: https://github.com/Nolonar/RM_Plugins-TitleMap/releases/latest/download/N_TitleMap.js
