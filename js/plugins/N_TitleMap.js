@@ -39,7 +39,9 @@
  * @min 1
  * 
  * 
- * @help This plugin does not provide plugin commands.
+ * @help Version 1.0.1
+ * 
+ * This plugin does not provide plugin commands.
  * 
  * Notes:
  * If you wish to use a map the player can visit during the game, know that
@@ -82,7 +84,8 @@
  * 
  * Plugin compatibility:
  * This plugin replaces Scene_Title, so compatibility with plugins that modify
- * Scene_Title is not guaranteed.
+ * Scene_Title is not guaranteed. For best compatibility, this plugin should
+ * be placed high in the plugin list.
  */
 
 (() => {
