@@ -81,11 +81,8 @@
  *      - Battle type commands only work in battle, so they do nothing.
  * 
  * Plugin compatibility:
- * This plugin replaces Scene_Title, and so is incompatible with any plugins
- * that modify Scene_Title. This Plugin is compatible with plugins that add
- * entries to Window_TitleCommand, as long as these entries bind to a function
- * outside of Scene_Title, or start with "command" (for example
- * "commandNewTitleEntry").
+ * This plugin replaces Scene_Title, so compatibility with plugins that modify
+ * Scene_Title is not guaranteed.
  */
 
 (() => {
