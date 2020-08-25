@@ -90,6 +90,7 @@
 
 (() => {
     let parameters = PluginManager.parameters('N_TitleMap');
+    parameters.mapId = Number(parameters.mapId) || 1;
 
     //=========================================================================
     // Scene_TitleMap
