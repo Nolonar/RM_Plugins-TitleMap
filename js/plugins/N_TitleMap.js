@@ -39,7 +39,7 @@
  * @default 1
  * 
  * 
- * @help Version 1.0.1
+ * @help Version 1.0.2
  * 
  * This plugin does not provide plugin commands.
  * 
