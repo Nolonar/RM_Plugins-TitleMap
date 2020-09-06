@@ -5,7 +5,7 @@ Use a map (with events) as title screen instead of a static image.
 
 | Project    | Latest release   |
 | ---------- | ---------------- |
-| N_TitleMap | [1.0.1][release] |
+| N_TitleMap | [1.0.2][release] |
 
 [All RPG Maker plugins by Nolonar][hub]
 
