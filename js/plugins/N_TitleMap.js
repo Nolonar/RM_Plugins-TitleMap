@@ -23,20 +23,20 @@
  */
 
 //=============================================================================
-// N_TitleMap
+// Metadata
 //=============================================================================
 /*:
  * @target MZ
  * @plugindesc Use a map as title screen.
  * @author Nolonar
- * @url https://github.com/Nolonar/RM_Plugins-TitleMap
+ * @url https://github.com/Nolonar/RM_Plugins
  * 
  * @param mapId
  * @text Map ID
  * @desc The id of the map to render as title screen.
  * @type number
- * @default 1
  * @min 1
+ * @default 1
  * 
  * 
  * @help Version 1.0.1
@@ -134,6 +134,7 @@
 
         onMapLoaded() {
             $gameMap.setup(parameters.mapId);
+            $dataMap.autoplayBgm = false; // Use Title Scene BGM instead.
             $gameMap.autoplay();
             $gamePlayer.center($gameMap.width() / 2, $gameMap.height() / 2);
             super.onMapLoaded();
@@ -149,6 +150,18 @@
             Scene_Base.prototype.stop.call(this);
         }
 
+        needsFadeIn() {
+            return true;
+        }
+
+        fadeOutAll() {
+            const time = this.slowFadeSpeed() / 60;
+            AudioManager.fadeOutBgm(time);
+            AudioManager.fadeOutBgs(time);
+            AudioManager.fadeOutMe(time);
+            this.startFadeOut(1);
+        }
+
         update() {
             $gameMap.update(true);
             $gameScreen.update();
@@ -159,15 +172,21 @@
 
         terminate() {
             super.terminate();
-            if (Graphics.isVideoPlaying && Graphics.isVideoPlaying()) {
-                // MV
-                Graphics._video.pause();
-                Graphics._onVideoEnd();
-            } else if (typeof Video !== "undefined" && Video.isPlaying()) {
-                // MZ
-                Video._element.pause();
-                Video._onEnd();
-            }
+            const stopVideo = {
+                MV: () => {
+                    if (Graphics.isVideoPlaying()) {
+                        Graphics._video.pause();
+                        Graphics._onVideoEnd();
+                    }
+                },
+                MZ: () => {
+                    if (Video.isPlaying()) {
+                        Video._element.pause();
+                        Video._onEnd();
+                    }
+                }
+            }[Utils.RPGMAKER_NAME];
+            stopVideo();
         }
     }
 
@@ -178,18 +197,11 @@
     Scene_Title_old.prototype.commandNewGame = function () {
         // Starting a new game resets the camera position,
         // so we remember the old position and set it back.
-        let previous = {
-            displayX: $gameMap._displayX,
-            displayY: $gameMap._displayY,
-            parallaxX: $gameMap._parallaxX,
-            parallaxY: $gameMap._parallaxY
-        };
-
+        let previousMap = $gameMap;
         Scene_Title_commandNewGame.call(this);
-
-        $gameMap._displayX = previous.displayX;
-        $gameMap._displayY = previous.displayY;
-        $gameMap._parallaxX = previous.parallaxX;
-        $gameMap._parallaxY = previous.parallaxY;
+        $gameMap._displayX = previousMap._displayX;
+        $gameMap._displayY = previousMap._displayY;
+        $gameMap._parallaxX = previousMap._parallaxX;
+        $gameMap._parallaxY = previousMap._parallaxY;
     };
 })();
