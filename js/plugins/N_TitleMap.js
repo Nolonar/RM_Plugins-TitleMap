@@ -39,7 +39,7 @@
  * @default 1
  * 
  * 
- * @help Version 1.0.2
+ * @help Version 1.0.3
  * 
  * This plugin does not provide plugin commands.
  * 
@@ -89,13 +89,15 @@
  */
 
 (() => {
-    let parameters = PluginManager.parameters('N_TitleMap');
+    const PLUGIN_NAME = "N_TitleMap";
+
+    const parameters = PluginManager.parameters(PLUGIN_NAME);
     parameters.mapId = Number(parameters.mapId) || 1;
 
     //=========================================================================
     // Scene_TitleMap
     //=========================================================================
-    let Scene_Title_old = Scene_Title;
+    const Scene_Title_old = Scene_Title;
     Scene_Title = class Scene_TitleMap extends Scene_Map {
         create() {
             Scene_Base.prototype.create.call(this);
@@ -112,9 +114,9 @@
         createCommandWindow() {
             // Copy all commands from Scene_Title. This is compatible with
             // Plugins that add their own command to Scene_Title.
-            let commands = Object.keys(Scene_Title_old.prototype)
+            const commands = Object.keys(Scene_Title_old.prototype)
                 .filter(property => property.startsWith("command"));
-            for (let command of commands) {
+            for (const command of commands) {
                 Scene_TitleMap.prototype[command] = Scene_Title_old.prototype[command];
             }
 
@@ -190,18 +192,26 @@
         }
     }
 
-    //=========================================================================
-    // Scene_Title
-    //=========================================================================
-    let Scene_Title_commandNewGame = Scene_Title_old.prototype.commandNewGame;
+    function resetWeather() {
+        $gameScreen.changeWeather("none", 0, 0);
+    }
+
+    function freezeCamera(action) {
+        const previousMap = $gameMap;
+        action();
+        for (const property of ["_displayX", "_displayY", "_parallaxX", "_parallaxY"])
+            $gameMap[property] = previousMap[property];
+    }
+
+    const Scene_Title_commandNewGame = Scene_Title_old.prototype.commandNewGame;
     Scene_Title_old.prototype.commandNewGame = function () {
-        // Starting a new game resets the camera position,
-        // so we remember the old position and set it back.
-        let previousMap = $gameMap;
-        Scene_Title_commandNewGame.call(this);
-        $gameMap._displayX = previousMap._displayX;
-        $gameMap._displayY = previousMap._displayY;
-        $gameMap._parallaxX = previousMap._parallaxX;
-        $gameMap._parallaxY = previousMap._parallaxY;
+        freezeCamera(Scene_Title_commandNewGame.bind(this));
+        resetWeather();
     };
+
+    const Scene_Load_onLoadSuccess = Scene_Load.prototype.onLoadSuccess;
+    Scene_Load.prototype.onLoadSuccess = function () {
+        Scene_Load_onLoadSuccess.call(this);
+        resetWeather();
+    }
 })();
