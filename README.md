@@ -3,9 +3,9 @@ Use a map (with events) as title screen instead of a static image.
 
 ![Screenshot TitleMap][on]
 
-| Project    | Latest release   |
-| ---------- | ---------------- |
-| N_TitleMap | [1.0.2][release] |
+| Project    | Latest release      |
+| ---------- | ------------------- |
+| N_TitleMap | [Download][release] |
 
 [All RPG Maker plugins by Nolonar][hub]
 
