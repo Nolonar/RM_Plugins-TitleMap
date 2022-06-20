@@ -39,7 +39,7 @@
  * @default 1
  * 
  * 
- * @help Version 1.0.3
+ * @help Version 1.0.4
  * 
  * This plugin does not provide plugin commands.
  * 
@@ -192,10 +192,6 @@
         }
     }
 
-    function resetWeather() {
-        $gameScreen.changeWeather("none", 0, 0);
-    }
-
     function freezeCamera(action) {
         const previousMap = $gameMap;
         action();
@@ -206,12 +202,6 @@
     const Scene_Title_commandNewGame = Scene_Title_old.prototype.commandNewGame;
     Scene_Title_old.prototype.commandNewGame = function () {
         freezeCamera(Scene_Title_commandNewGame.bind(this));
-        resetWeather();
+        $gameScreen.clearWeather();
     };
-
-    const Scene_Load_onLoadSuccess = Scene_Load.prototype.onLoadSuccess;
-    Scene_Load.prototype.onLoadSuccess = function () {
-        Scene_Load_onLoadSuccess.call(this);
-        resetWeather();
-    }
 })();

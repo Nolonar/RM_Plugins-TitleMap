@@ -11,7 +11,7 @@ Use a map (with events) as title screen instead of a static image.
 
 ## Compatibility
 Tested and confirmed working:
-- RPG Maker MV
+- RPG Maker MV ([1.0.4][release_1_0_4] only; newer versions might work, but are untested)
 - RPG Maker MZ
 
 ## Terms of Use
@@ -38,3 +38,4 @@ You can see the Map ID in the status bar at the bottom of the RPG Maker UI.
 
   [hub]: https://github.com/Nolonar/RM_Plugins
   [release]: https://github.com/Nolonar/RM_Plugins-TitleMap/releases/latest/download/N_TitleMap.js
+  [release_1_0_4]: https://github.com/Nolonar/RM_Plugins-TitleMap/releases/download/v1.0.4/N_TitleMap.js
