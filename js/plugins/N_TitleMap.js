@@ -39,7 +39,7 @@
  * @default 1
  * 
  * 
- * @help Version 1.0.4
+ * @help Version 1.0.5
  * 
  * This plugin does not provide plugin commands.
  * 
@@ -100,9 +100,15 @@
     const Scene_Title_old = Scene_Title;
     Scene_Title = class Scene_TitleMap extends Scene_Map {
         create() {
-            Scene_Base.prototype.create.call(this);
+            Scene_Title_old.prototype.create.call(this);
+            // Copy all commands from Scene_Title. This is compatible with
+            // Plugins that add their own command to Scene_Title.
+            Object.keys(Scene_Title_old.prototype).filter(p => p.startsWith("command")).forEach(c => {
+                Scene_TitleMap.prototype[c] = Scene_Title_old.prototype[c];
+            });
+
             DataManager.loadMapData(parameters.mapId);
-            this.createCommandWindow();
+
             // Scene_Map will create its own window layer later on.
             this.removeChild(this._windowLayer);
 
@@ -111,18 +117,8 @@
             DataManager.setupNewGame();
         }
 
-        createCommandWindow() {
-            // Copy all commands from Scene_Title. This is compatible with
-            // Plugins that add their own command to Scene_Title.
-            const commands = Object.keys(Scene_Title_old.prototype)
-                .filter(property => property.startsWith("command"));
-            for (const command of commands) {
-                Scene_TitleMap.prototype[command] = Scene_Title_old.prototype[command];
-            }
-
-            this.createWindowLayer();
-            Scene_Title_old.prototype.createCommandWindow.call(this);
-        }
+        createBackground() { Scene_Title_old.prototype.createBackground.call(this); }
+        createForeground() { Scene_Title_old.prototype.createForeground.call(this); }
 
         createAllWindows() {
             super.createAllWindows();
