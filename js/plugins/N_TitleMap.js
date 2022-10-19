@@ -39,7 +39,7 @@
  * @default 1
  * 
  * 
- * @help Version 1.0.5
+ * @help Version 1.0.6
  * 
  * This plugin does not provide plugin commands.
  * 
@@ -94,6 +94,15 @@
     const parameters = PluginManager.parameters(PLUGIN_NAME);
     parameters.mapId = Number(parameters.mapId) || 1;
 
+    // JavaScript does not support multiple inheritance.
+    // This method attempts to address this problem by
+    // implementing Scene_Title properties after the fact.
+    function copySceneTitleProperties() {
+        Object.keys(Scene_Title_old.prototype).filter(p => !(p in Scene_Title.prototype)).forEach(p => {
+            Scene_Title.prototype[p] = Scene_Title_old.prototype[p];
+        });
+    }
+
     //=========================================================================
     // Scene_TitleMap
     //=========================================================================
@@ -101,33 +110,21 @@
     Scene_Title = class Scene_TitleMap extends Scene_Map {
         create() {
             Scene_Title_old.prototype.create.call(this);
-            // Copy all commands from Scene_Title. This is compatible with
-            // Plugins that add their own command to Scene_Title.
-            Object.keys(Scene_Title_old.prototype).filter(p => p.startsWith("command")).forEach(c => {
-                Scene_TitleMap.prototype[c] = Scene_Title_old.prototype[c];
-            });
 
             DataManager.loadMapData(parameters.mapId);
 
             // Scene_Map will create its own window layer later on.
             this.removeChild(this._windowLayer);
+            this._windowLayer_old = this._windowLayer;
 
             // Needed to avoid player character from appearing on TitleMap when
             // player returns to Title.
             DataManager.setupNewGame();
         }
 
-        createBackground() { Scene_Title_old.prototype.createBackground.call(this); }
-        createForeground() { Scene_Title_old.prototype.createForeground.call(this); }
-
         createAllWindows() {
             super.createAllWindows();
-            this.addWindow(this._commandWindow);
-            this._commandWindow.open();
-        }
-
-        drawGameTitle() {
-            Scene_Title_old.prototype.drawGameTitle.call(this);
+            this._windowLayer_old.children.forEach(c => this.addWindow(c));
         }
 
         onMapLoaded() {
@@ -136,15 +133,16 @@
             $gameMap.autoplay();
             $gamePlayer.center($gameMap.width() / 2, $gameMap.height() / 2);
             super.onMapLoaded();
-            Scene_Title_old.prototype.createForeground.call(this);
+            this.createForeground.call(this);
         }
 
         start() {
             super.start();
-            Scene_Title_old.prototype.playTitleMusic();
+            this.playTitleMusic();
         }
 
         stop() {
+            // Avoid using Scene_Map.stop()
             Scene_Base.prototype.stop.call(this);
         }
 
@@ -165,7 +163,7 @@
             $gameScreen.update();
 
             this.updateWaitCount();
-            Scene_Base.prototype.update.call(this);
+            Scene_Title_old.prototype.update.call(this);
         }
 
         terminate() {
@@ -200,4 +198,6 @@
         freezeCamera(Scene_Title_commandNewGame.bind(this));
         $gameScreen.clearWeather();
     };
+
+    copySceneTitleProperties();
 })();
