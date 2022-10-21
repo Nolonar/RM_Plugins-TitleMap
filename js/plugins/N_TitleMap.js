@@ -134,6 +134,10 @@
     parameters.useLatestSavefileMapId = parameters.useLatestSavefileMapId === "true";
     parameters.titleSwitch = Number(parameters.titleSwitch) || 0;
 
+    function isMV() {
+        return Utils.RPGMAKER_NAME === "MV";
+    }
+
     //=========================================================================
     // Scene_TitleMap
     //=========================================================================
@@ -142,23 +146,24 @@
         initialize() {
             super.initialize();
             this._isMapChanging = false;
+            this._isMapLoaded = false;
         }
 
         async create() {
             Scene_Title_old.prototype.create.call(this);
 
             // Scene_Map will create its own window layer later on.
+            this.oldWindows = [...this._windowLayer.children];
             this.removeChild(this._windowLayer);
-            this._windowLayer_old = this._windowLayer;
 
             // Sets the title screen's map.
             if (this.needsFadeIn()) {
                 const mapData = await this.getMapData();
                 $gamePlayer.reserveTransfer(mapData.id, mapData.x, mapData.y, 2, 0);
-            }
 
-            // Keep player character hidden.
-            $gamePlayer._transparent = $gamePlayer._through = true;
+                // Keep player character hidden.
+                $gamePlayer._transparent = $gamePlayer._through = true;
+            }
 
             // Performs the initial transfer.
             super.create();
@@ -176,7 +181,7 @@
                 y = $gamePlayer._y;
 
                 const map = await this.loadMap(mapId);
-                if ("title" in map.meta) {
+                if ("titlescreen" in map.meta) {
                     const parts = map.meta.title.replace(/\s/g, "").split(",");
                     mapId = Number(parts[0]);
                     x = Number(parts[1]);
@@ -200,7 +205,9 @@
                 const src = `Map${mapId.padZero(3)}.json`;
                 const url = `data/${src}`;
                 const errorHandler = () => {
-                    DataManager.onXhrError("$dataMap", src, url);
+                    if (!isMV())
+                        DataManager.onXhrError("$dataMap", src, url);
+
                     reject();
                 };
                 xhr.open("GET", url);
@@ -221,12 +228,11 @@
 
         createAllWindows() {
             super.createAllWindows();
-            this._windowLayer_old.children.forEach(c => this.addWindow(c));
+            this.oldWindows.forEach(c => this.addWindow(c));
         }
 
         onMapLoaded() {
             super.onMapLoaded();
-            $gamePlayer.center($gameMap.width() / 2, $gameMap.height() / 2);
             this.createForeground.call(this);
         }
 
@@ -237,7 +243,9 @@
 
         onTransfer() {
             this.fadeOutForTransfer();
-            super.onTransfer();
+            // MV Scene_Map doesn't have an onTransfer() function.
+            if (super.onTransfer)
+                super.onTransfer();
         }
 
         onTransferEnd() {
@@ -270,6 +278,11 @@
             return false;
         }
 
+        // MV compatibility layer.
+        isFading() {
+            return isMV() ? this.isBusy() : super.isFading();
+        }
+
         shouldAutosave() {
             return false;
         }
@@ -278,7 +291,7 @@
             if (!this.isBusy())
                 this._commandWindow.open();
 
-            if (this._isMapChanging && !this.isFading() && DataManager.isMapLoaded()) {
+            if (this._isMapChanging && this._isMapLoaded && !this.isFading()) {
                 // Move player character to designated coordinates.
                 $gamePlayer.performTransfer();
                 // Force spriteset to recreate the map.
@@ -298,14 +311,27 @@
             $gameScreen.update();
         }
 
+        updateScene() {
+            if (SceneManager.isSceneChanging())
+                return;
+
+            this.updateTransferPlayer();
+            this.updateCallDebug();
+        }
+
         updateTransferPlayer() {
-            if ($gamePlayer.isTransferring() && !this._isMapChanging) {
-                DataManager.loadMapData($gamePlayer.newMapId());
-                this.onTransfer();
-                // Avoid SceneManager.goto() to ensure the command
-                // window remains responsive during the transfer.
-                this._isMapChanging = true;
-            }
+            if (!$gamePlayer.isTransferring() || this._isMapChanging)
+                return;
+
+            // Avoid SceneManager.goto() to ensure the command
+            // window remains responsive during the transfer.
+            this._isMapChanging = true;
+            this._isMapLoaded = false;
+            this.loadMap($gamePlayer.newMapId()).then(data => {
+                $dataMap = data;
+                this._isMapLoaded = true;
+            });
+            this.onTransfer();
         }
 
         terminate() {
@@ -313,7 +339,7 @@
 
             this.stopVideo();
 
-            if (SceneManager.isNextScene(Scene_Map)) {
+            if (SceneManager.isNextScene(Scene_Map) || SceneManager._nextScene instanceof Scene_Map) {
                 // Ensure $gameMap and $gameScreen are in the default state.
                 $gameMap = new Game_Map();
                 $gameScreen = new Game_Screen();
@@ -324,22 +350,18 @@
         }
 
         stopVideo() {
-            switch (Utils.RPGMAKER_NAME) {
-                case "MV":
-                    if (!Graphics.isVideoPlaying())
-                        return;
+            if (isMV()) {
+                if (!Graphics.isVideoPlaying())
+                    return;
 
-                    Graphics._video.pause();
-                    Graphics._onVideoEnd();
-                    break;
+                Graphics._video.pause();
+                Graphics._onVideoEnd();
+            } else {
+                if (!Video.isPlaying())
+                    return;
 
-                case "MZ":
-                    if (!Video.isPlaying())
-                        return;
-
-                    Video._element.pause();
-                    Video._onEnd();
-                    break;
+                Video._element.pause();
+                Video._onEnd();
             }
         }
 
@@ -363,4 +385,15 @@
     for (const p of Object.keys(Scene_Title_old.prototype).filter(p => !(p in Scene_Title.prototype))) {
         Scene_Title.prototype[p] = Scene_Title_old.prototype[p];
     }
+
+    //=========================================================================
+    // Scene_Load
+    //=========================================================================
+    const Scene_Load_onLoadSuccess = Scene_Load.prototype.onLoadSuccess;
+    Scene_Load.prototype.onLoadSuccess = function () {
+        Scene_Load_onLoadSuccess.call(this);
+
+        // Stops Scene_Map from triggering an autosave.
+        $dataMap = null;
+    };
 })();
