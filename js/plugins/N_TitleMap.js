@@ -38,8 +38,34 @@
  * @min 1
  * @default 1
  * 
+ * @param xCoord
+ * @text X-coordinate
+ * @desc The x-coordinate of the (invisible) player character.
+ * @type number
+ * @min 0
+ * @default 0
  * 
- * @help Version 1.0.6
+ * @param yCoord
+ * @text Y-coordinate
+ * @desc The y-coordinate of the (invisible) player character.
+ * @type number
+ * @min 0
+ * @default 0
+ * 
+ * @param useLatestSavefileMapId
+ * @text Use Map from latest save file
+ * @desc Whether to use the map of the latest save file as title screen, if one exists.
+ * @type boolean
+ * @default false
+ * 
+ * @param titleSwitch
+ * @text Title Screen Switch
+ * @desc Specify a switch that will be ON when the Title Screen is active, and OFF otherwise.
+ * @type switch
+ * @default 0
+ * 
+ * 
+ * @help Version 1.1.0
  * 
  * This plugin does not provide plugin commands.
  * 
@@ -49,8 +75,8 @@
  * all Variables will be 0. You can change Switches and Variables, but they
  * will be reset when you return to the Title Screen.
  * 
- * This plugin is designed without the player character (or followers) in mind.
- * If you wish to display the player character, use an event instead.
+ * The player character will be transparent and through by default. Use event
+ * commands to undo this when needed.
  * 
  * Works with most event command, with a few limitations:
  * 
@@ -62,14 +88,6 @@
  *      - Avoid the "Play Movie..." command. Movies will hide the Title Command
  *        window, but players can still interact with it.
  * 
- *      - The following commands do nothing:
- *          - Transfer Player...
- *          - Set Movement Route... (with Player as target)
- *          - Get on/off Vehicle
- *          - Change Transparency...
- *          - Change Player Followers...
- *          - Gather Followers
- * 
  *      - Scene Control type commands like "Battle Processing..." work, but why
  *        would you even use them on the Title Screen? Remember that all
  *        Switches (including Self Switches) and Variables will be reset when
@@ -80,12 +98,30 @@
  * 
  *      - "Change Map Name Display..." does nothing.
  * 
- *      - Battle type commands only work in battle, so they do nothing.
+ *      - Battle type commands only work in battle, so they won't do anything.
  * 
  * Plugin compatibility:
  * This plugin replaces Scene_Title, so compatibility with plugins that modify
  * Scene_Title is not guaranteed. For best compatibility, this plugin should
  * be placed high in the plugin list.
+ * 
+ * ============================================================================
+ * Notetags
+ * ============================================================================
+ * 
+ * Map Notetag:
+ * <titlescreen: mapId, x, y>
+ *      If the latest save file was made on a map with this notetag, the title
+ *      screen map will be chosen according to the notetag instead.
+ *          - mapId: The map ID to use as title screen map.
+ *          - x:     The x-coordinate of the (invisible) player character.
+ *          - y:     The y-coordinate of the (invisible) player character.
+ * 
+ *      Example:
+ *          <titlescreen: 3, 10, 12>
+ *                   The map with ID 3 will be chosen as the title screen map
+ *                   instead of the current one. The player character will be
+ *                   placed at the coordinates (10, 12).
  */
 
 (() => {
@@ -93,33 +129,94 @@
 
     const parameters = PluginManager.parameters(PLUGIN_NAME);
     parameters.mapId = Number(parameters.mapId) || 1;
-
-    // JavaScript does not support multiple inheritance.
-    // This method attempts to address this problem by
-    // implementing Scene_Title properties after the fact.
-    function copySceneTitleProperties() {
-        Object.keys(Scene_Title_old.prototype).filter(p => !(p in Scene_Title.prototype)).forEach(p => {
-            Scene_Title.prototype[p] = Scene_Title_old.prototype[p];
-        });
-    }
+    parameters.xCoord = Number(parameters.xCoord) || 0;
+    parameters.yCoord = Number(parameters.yCoord) || 0;
+    parameters.useLatestSavefileMapId = parameters.useLatestSavefileMapId === "true";
+    parameters.titleSwitch = Number(parameters.titleSwitch) || 0;
 
     //=========================================================================
     // Scene_TitleMap
     //=========================================================================
     const Scene_Title_old = Scene_Title;
     Scene_Title = class Scene_TitleMap extends Scene_Map {
-        create() {
-            Scene_Title_old.prototype.create.call(this);
+        initialize() {
+            super.initialize();
+            this._isMapChanging = false;
+        }
 
-            DataManager.loadMapData(parameters.mapId);
+        async create() {
+            Scene_Title_old.prototype.create.call(this);
 
             // Scene_Map will create its own window layer later on.
             this.removeChild(this._windowLayer);
             this._windowLayer_old = this._windowLayer;
 
-            // Needed to avoid player character from appearing on TitleMap when
-            // player returns to Title.
-            DataManager.setupNewGame();
+            // Sets the title screen's map.
+            if (this.needsFadeIn()) {
+                const mapData = await this.getMapData();
+                $gamePlayer.reserveTransfer(mapData.id, mapData.x, mapData.y, 2, 0);
+            }
+
+            // Keep player character hidden.
+            $gamePlayer._transparent = $gamePlayer._through = true;
+
+            // Performs the initial transfer.
+            super.create();
+        }
+
+        async getMapData() {
+            let mapId = parameters.mapId;
+            let x = parameters.xCoord, y = parameters.yCoord;
+
+            // Retrieve info from latest save file.
+            if (parameters.useLatestSavefileMapId && DataManager.isAnySavefileExists()) {
+                await DataManager.loadGame(DataManager.latestSavefileId());
+                mapId = $gameMap.mapId();
+                x = $gamePlayer._x;
+                y = $gamePlayer._y;
+
+                const map = await this.loadMap(mapId);
+                if ("title" in map.meta) {
+                    const parts = map.meta.title.replace(/\s/g, "").split(",");
+                    mapId = Number(parts[0]);
+                    x = Number(parts[1]);
+                    y = Number(parts[2]);
+                }
+
+                if (parameters.titleSwitch)
+                    $gameSwitches.setValue(parameters.titleSwitch, true);
+            }
+
+            return {
+                id: mapId,
+                x: x,
+                y: y
+            };
+        }
+
+        async loadMap(mapId) {
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                const src = `Map${mapId.padZero(3)}.json`;
+                const url = `data/${src}`;
+                const errorHandler = () => {
+                    DataManager.onXhrError("$dataMap", src, url);
+                    reject();
+                };
+                xhr.open("GET", url);
+                xhr.overrideMimeType("application/json");
+                xhr.onload = () => {
+                    if (xhr.status < 400) {
+                        const result = JSON.parse(xhr.responseText);
+                        DataManager.onLoad(result);
+                        resolve(result);
+                    } else {
+                        errorHandler();
+                    }
+                };
+                xhr.onerror = errorHandler;
+                xhr.send();
+            });
         }
 
         createAllWindows() {
@@ -128,11 +225,8 @@
         }
 
         onMapLoaded() {
-            $gameMap.setup(parameters.mapId);
-            $dataMap.autoplayBgm = false; // Use Title Scene BGM instead.
-            $gameMap.autoplay();
-            $gamePlayer.center($gameMap.width() / 2, $gameMap.height() / 2);
             super.onMapLoaded();
+            $gamePlayer.center($gameMap.width() / 2, $gameMap.height() / 2);
             this.createForeground.call(this);
         }
 
@@ -141,63 +235,132 @@
             this.playTitleMusic();
         }
 
+        onTransfer() {
+            this.fadeOutForTransfer();
+            super.onTransfer();
+        }
+
+        onTransferEnd() {
+            // Don't call super.onTransferEnd() to avoid opening the map name window,
+            // autosaving, and playing the map's BGM/BGS.
+            this.fadeInForTransfer();
+        }
+
         stop() {
             // Avoid using Scene_Map.stop()
-            Scene_Base.prototype.stop.call(this);
+            Scene_Title_old.prototype.stop.call(this);
         }
 
         needsFadeIn() {
-            return true;
+            return [
+                Scene_Options,
+                Scene_Load
+            ].every(scene => !SceneManager.isPreviousScene(scene));
         }
 
-        fadeOutAll() {
-            const time = this.slowFadeSpeed() / 60;
-            AudioManager.fadeOutBgm(time);
-            AudioManager.fadeOutBgs(time);
-            AudioManager.fadeOutMe(time);
-            this.startFadeOut(1);
+        needsSlowFadeOut() {
+            return false;
+        }
+
+        isMenuEnabled() {
+            return false;
+        }
+
+        isMapTouchOk() {
+            return false;
+        }
+
+        shouldAutosave() {
+            return false;
         }
 
         update() {
-            $gameMap.update(true);
-            $gameScreen.update();
+            if (!this.isBusy())
+                this._commandWindow.open();
 
-            this.updateWaitCount();
-            Scene_Title_old.prototype.update.call(this);
+            if (this._isMapChanging && !this.isFading() && DataManager.isMapLoaded()) {
+                // Move player character to designated coordinates.
+                $gamePlayer.performTransfer();
+                // Force spriteset to recreate the map.
+                this._spriteset.createLowerLayer();
+                this._spriteset.createUpperLayer();
+
+                this.onTransferEnd();
+                this._isMapChanging = false;
+            }
+
+            super.update();
+        }
+
+        updateMain() {
+            $gameMap.update(this.isActive());
+            $gameTimer.update(this.isActive());
+            $gameScreen.update();
+        }
+
+        updateTransferPlayer() {
+            if ($gamePlayer.isTransferring() && !this._isMapChanging) {
+                DataManager.loadMapData($gamePlayer.newMapId());
+                this.onTransfer();
+                // Avoid SceneManager.goto() to ensure the command
+                // window remains responsive during the transfer.
+                this._isMapChanging = true;
+            }
         }
 
         terminate() {
             super.terminate();
-            const stopVideo = {
-                MV: () => {
-                    if (Graphics.isVideoPlaying()) {
-                        Graphics._video.pause();
-                        Graphics._onVideoEnd();
-                    }
-                },
-                MZ: () => {
-                    if (Video.isPlaying()) {
-                        Video._element.pause();
-                        Video._onEnd();
-                    }
-                }
-            }[Utils.RPGMAKER_NAME];
-            stopVideo();
+
+            this.stopVideo();
+
+            if (SceneManager.isNextScene(Scene_Map)) {
+                // Ensure $gameMap and $gameScreen are in the default state.
+                $gameMap = new Game_Map();
+                $gameScreen = new Game_Screen();
+
+                // Stops Scene_Map from triggering an autosave.
+                $dataMap = null;
+            }
+        }
+
+        stopVideo() {
+            switch (Utils.RPGMAKER_NAME) {
+                case "MV":
+                    if (!Graphics.isVideoPlaying())
+                        return;
+
+                    Graphics._video.pause();
+                    Graphics._onVideoEnd();
+                    break;
+
+                case "MZ":
+                    if (!Video.isPlaying())
+                        return;
+
+                    Video._element.pause();
+                    Video._onEnd();
+                    break;
+            }
+        }
+
+        commandNewGame() {
+            // Prevent scroll position, screen tone and weather from
+            // changing before title screen has finished fading out.
+            const previousMap = $gameMap;
+            const previousScreen = $gameScreen;
+            DataManager.setupNewGame();
+            $gameMap = previousMap;
+            $gameScreen = previousScreen;
+
+            this._commandWindow.close();
+            this.fadeOutAll();
+            SceneManager.goto(Scene_Map);
         }
     }
 
-    function freezeCamera(action) {
-        const previousMap = $gameMap;
-        action();
-        for (const property of ["_displayX", "_displayY", "_parallaxX", "_parallaxY"])
-            $gameMap[property] = previousMap[property];
+    // JavaScript does not support multiple inheritance, so we
+    // need to copy the properties of Scene_Title separately.
+    for (const p of Object.keys(Scene_Title_old.prototype).filter(p => !(p in Scene_Title.prototype))) {
+        Scene_Title.prototype[p] = Scene_Title_old.prototype[p];
     }
-
-    const Scene_Title_commandNewGame = Scene_Title_old.prototype.commandNewGame;
-    Scene_Title_old.prototype.commandNewGame = function () {
-        freezeCamera(Scene_Title_commandNewGame.bind(this));
-        $gameScreen.clearWeather();
-    };
-
-    copySceneTitleProperties();
 })();
