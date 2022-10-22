@@ -158,6 +158,10 @@
 
             // Sets the title screen's map.
             if (this.needsFadeIn()) {
+                // Prevents previous map flickering on Scene_TitleMap.
+                // Must be called before getMapData() for some reason...
+                $dataMap = null;
+
                 const mapData = await this.getMapData();
                 $gamePlayer.reserveTransfer(mapData.id, mapData.x, mapData.y, 2, 0);
 
@@ -255,8 +259,8 @@
         }
 
         stop() {
-            // Avoid using Scene_Map.stop()
-            Scene_Title_old.prototype.stop.call(this);
+            this.stopVideo();
+            super.stop();
         }
 
         needsFadeIn() {
@@ -336,8 +340,6 @@
 
         terminate() {
             super.terminate();
-
-            this.stopVideo();
 
             if (SceneManager.isNextScene(Scene_Map) || SceneManager._nextScene instanceof Scene_Map) {
                 // Ensure $gameMap and $gameScreen are in the default state.
