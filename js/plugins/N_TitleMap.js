@@ -185,7 +185,7 @@
                 y = $gamePlayer._y;
 
                 const map = await this.loadMap(mapId);
-                if ("titlescreen" in map.meta) {
+                if (map.meta && "titlescreen" in map.meta) {
                     const parts = map.meta.title.replace(/\s/g, "").split(",");
                     mapId = Number(parts[0]);
                     x = Number(parts[1]);
