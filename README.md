@@ -11,7 +11,7 @@ Use a map (with events) as title screen instead of a static image.
 
 ## Compatibility
 Tested and confirmed working:
-- RPG Maker MV ([1.0.4][release_1_0_4] only; newer versions might work, but are untested)
+- RPG Maker MV
 - RPG Maker MZ
 
 ## Terms of Use
